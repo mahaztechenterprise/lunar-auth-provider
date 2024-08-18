@@ -1,5 +1,6 @@
 use std::sync::Arc;
 use dotenv::dotenv;
+use sqlx::Connection;
 use tokio::net::TcpListener;
 
 mod user;
@@ -30,8 +31,4 @@ async fn main() {
     println!("Server started {:#?}", ip);
 
     server.await.unwrap();
-}
-
-fn migrate_db() {
-    
 }

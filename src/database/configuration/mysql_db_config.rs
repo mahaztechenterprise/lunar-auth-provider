@@ -1,7 +1,15 @@
+use std::{borrow::BorrowMut, fmt::Debug, str::FromStr};
+
 use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
+use refinery::config::Config;
 
 pub struct PoolConnection {
     pub db: MySqlPool
+}
+
+
+mod embedded {
+    refinery::embed_migrations!("./migrations/");
 }
 
 pub async fn connect() -> PoolConnection {
@@ -13,6 +21,11 @@ pub async fn connect() -> PoolConnection {
     {
         Ok(pool) => {
             println!("Connection to the database is successful!");
+            println!("Migrating database");
+            
+            let conn = Config::from_str(&database_url);
+            let result = embedded::migrations::runner().run(&mut conn.unwrap()).unwrap();
+            println!("{:#?}", result);
             pool
         }
         Err(err) => {
@@ -20,6 +33,6 @@ pub async fn connect() -> PoolConnection {
             std::process::exit(1);
         }
     };
-
+    
     return PoolConnection { db: pool.clone() };
 }
