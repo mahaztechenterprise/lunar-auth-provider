@@ -1,5 +1,5 @@
-use std::{borrow::BorrowMut, fmt::Debug, str::FromStr};
-
+use std::str::FromStr;
+use log::{info, error};
 use sqlx::mysql::{MySqlPool, MySqlPoolOptions};
 use refinery::config::Config;
 
@@ -20,16 +20,16 @@ pub async fn connect() -> PoolConnection {
         .await
     {
         Ok(pool) => {
-            println!("Connection to the database is successful!");
-            println!("Migrating database");
+            info!("Connection to the database is successful!");
+            info!("Migrating database");
             
             let conn = Config::from_str(&database_url);
             let result = embedded::migrations::runner().run(&mut conn.unwrap()).unwrap();
-            println!("{:#?}", result);
+            info!("{:#?}", result);
             pool
         }
         Err(err) => {
-            println!("Failed to connect to the database: {:?}", err);
+            error!("Failed to connect to the database: {:?}", err);
             std::process::exit(1);
         }
     };

@@ -1,12 +1,12 @@
-use std::{borrow::BorrowMut, sync::Arc};
+use std::sync::Arc;
 use axum::{
-    extract::{ Path, Query, State },
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
 use serde::Serialize;
-use super::{super::super::database::configuration::mysql_db_config::PoolConnection, create_user_dto::CreateUser}; 
+use super::super::super::database::configuration::mysql_db_config::PoolConnection; 
 
 #[derive(Debug, Serialize)]
 struct UserResponseData {
@@ -53,12 +53,4 @@ pub async fn create_user(
             "data": user_data,
         });
     return Ok(Json(response));
-}
-
-pub async fn get_users() -> &'static str {
-    return "List of Users";
-}
-
-pub async fn is_valid_user() -> &'static str {
-    return "The user is valid";
 }
