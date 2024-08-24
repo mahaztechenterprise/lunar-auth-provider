@@ -14,6 +14,6 @@ pub struct AppUser {
 pub struct AppUserCustomAttribute {
     pub id: String,
     pub user_id: String,
-    pub key: String,
-    pub value: String,
+    pub _key: String,
+    pub _value: String,
 }
