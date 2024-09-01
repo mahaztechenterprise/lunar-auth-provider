@@ -9,3 +9,11 @@ pub struct AppUser {
     pub attr_key: std::option::Option<String>,
     pub attr_value: std::option::Option<String>,
 }
+
+#[derive(Debug, Deserialize, Serialize, Clone, sqlx::FromRow)]
+pub struct AppRole {
+    pub id: String,
+    pub role_name: String,
+    pub is_active: i8,
+    pub user_id: String,
+}
