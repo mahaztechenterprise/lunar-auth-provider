@@ -3,6 +3,8 @@ use serde::{Deserialize, Serialize};
 use sqlx::{MySql, QueryBuilder};
 use std::sync::Arc;
 
+use crate::database::model::app_user::AppUser;
+
 use super::super::super::database::configuration::mysql_db_config::PoolConnection;
 
 #[derive(Deserialize, Serialize, Debug, Default, Clone)]
@@ -23,6 +25,7 @@ pub struct GetUser {
 #[derive(Debug, Deserialize, Serialize, Default, Clone)]
 pub struct GetUserWithPassword {
     pub id: String,
+    pub username: String,
     pub password: String,
     pub is_active: i8,
 }
@@ -87,6 +90,20 @@ impl CreateUser {
                 status: 400,
             }),
         };
+    }
+
+    pub async fn get_active_user(data: Arc<PoolConnection>, id: String) -> Vec<AppUser> {
+        return sqlx::query_as!(AppUser, r#"
+            SELECT app.id as id, username, name, 
+            attributes.id as attr_id, _key as attr_key, _value as attr_value   
+            FROM APP_USER app  
+            left join APP_USER_CUSTOM_ATTRIBUTE attributes 
+            ON (app.id = attributes.user_id) 
+            where is_active = true and app.id = ? "#, 
+            id.to_string())
+        .fetch_all(&data.db)
+        .await
+        .unwrap_or_default();
     }
 }
 

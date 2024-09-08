@@ -1,23 +1,30 @@
 use std::sync::Arc;
 use axum::{
-    extract::{State, Path},
+    extract::State,
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
+use jsonwebtoken::{encode, EncodingKey, Header};
 use serde::{ Serialize, Deserialize };
-use sqlx::{MySql, QueryBuilder};
 use super::super::super::database::configuration::mysql_db_config::PoolConnection;
 use super::user_service::GetUserWithPassword;
 
 
 #[derive(Debug, Serialize)]
-
 struct AuthResponse {
     access_token: String,
     refresh_token: String,
     scope: String,
-    expires_at: i32,
+    expires_at: u32,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct TokenClaim {
+    sub: String,
+    iat: String,
+    exp: u32,
+    id: String,
 }
 
 #[derive(Debug, Deserialize, Serialize, Default)]
@@ -27,12 +34,30 @@ pub struct AuthRequest {
 }
 
 
-fn verify_password(password: String, user: GetUserWithPassword) -> bool {
+fn verify_password(password: String, user: &GetUserWithPassword) -> bool {
     let is_verified = bcrypt::verify(password, &user.password);
     match is_verified {
         Ok(verified) => verified,
         Err(_) => false 
     }
+}
+
+fn create_token(user: &GetUserWithPassword) -> Result<String, jsonwebtoken::errors::Error> {
+    let token_claim = TokenClaim {
+        iat: String::from("iat"),
+        id: user.id.clone(),
+        exp: 10000,
+        sub: user.username.clone(),
+    };
+
+    let jwt_secret = std::env::var("JWS_SECRET").unwrap();
+
+    let token = encode(
+        &Header::default(), 
+        &token_claim, 
+        &EncodingKey::from_secret(jwt_secret.as_ref()));
+
+    return token;
 }
 
 pub async fn login_user(
@@ -43,7 +68,7 @@ pub async fn login_user(
     let username = body.username;
 
     let result = sqlx::query_as!(GetUserWithPassword,
-        "SELECT id, password, is_active FROM app_user WHERE username = ?",
+        "SELECT id, username, password, is_active FROM app_user WHERE username = ?",
         username)
         .fetch_optional(&data.db)
         .await;
@@ -70,15 +95,34 @@ pub async fn login_user(
     let user = res.unwrap();
     if user.is_active == 0 {
         return Err((StatusCode::UNAUTHORIZED, 
-            Json((error_message))))
+            Json(error_message)))
     }
     
-    let is_verified = verify_password(body.password, user);
+    let is_verified = verify_password(body.password, &user);
     
-    if is_verified {
+    if !is_verified {
         return Err((StatusCode::UNAUTHORIZED, 
-            Json((error_message))));
+            Json(error_message)));
     }
 
-    return Ok(Json(serde_json::json!({ "status": "success" })));
+    let auth_response = match create_token(&user) {
+        Ok(token) => Json(serde_json::json!(AuthResponse {
+            access_token: token,
+            expires_at: 10000,
+            refresh_token: String::from("not implemented"),
+            scope: String::from("not implemented"),
+        })),
+        Err(_err) => Json(serde_json::json!({ "status": "failed", "message": "failed to create token"})),
+    };
+
+    return Ok(auth_response);
 }
+
+pub fn refresh_the_token() {
+    todo!("implement handler for refreshing token")
+}
+
+pub fn validate_token() {
+    todo!("validate the access token")
+}
+

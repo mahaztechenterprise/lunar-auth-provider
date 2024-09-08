@@ -6,13 +6,12 @@ use axum::{
     Json,
 };
 use super::super::super::database::configuration::mysql_db_config::PoolConnection;
-use super::super::super::database::model::app_user::AppUser; 
 use super::user_service::{AddCustomAttribute, GetCustomAttribute, GetUser };
-
+use crate::user::handlers::user_service::CreateUser;
 
 pub async fn create_user(
     State(data): State<Arc<PoolConnection>>,
-    Json(body): Json<super::user_service::CreateUser>) 
+    Json(body): Json<CreateUser>) 
     -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)>
 {
     let query_result = body
@@ -45,17 +44,7 @@ pub async fn get_active_user_by_id(
     State(data): State<Arc<PoolConnection>>,
     Path(id): Path<uuid::Uuid>) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> 
 {
-    let query_result = sqlx::query_as!(AppUser, r#"
-        SELECT app.id as id, username, name, 
-        attributes.id as attr_id, _key as attr_key, _value as attr_value   
-        FROM APP_USER app  
-        left join APP_USER_CUSTOM_ATTRIBUTE attributes 
-        ON (app.id = attributes.user_id) 
-        where is_active = true and app.id = ? "#, 
-        id.to_string())
-    .fetch_all(&data.db)
-    .await
-    .unwrap_or_default();
+    let query_result = CreateUser::get_active_user(data, id.to_string()).await;
 
     if query_result.is_empty() {
         return Err((StatusCode::NOT_FOUND,
