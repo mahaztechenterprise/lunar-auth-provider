@@ -141,3 +141,15 @@ impl AddCustomAttribute  {
         }
     }
 }
+
+
+impl GetUserWithPassword {
+    pub async fn get_user_with_password(username: String, data: Arc<PoolConnection>) -> Result<Option<GetUserWithPassword>, sqlx::Error> {
+        let result = sqlx::query_as!(GetUserWithPassword,
+            "SELECT id, username, password, is_active FROM app_user WHERE username = ?",
+            username)
+            .fetch_optional(&data.db)
+            .await;    
+        return result;
+    }
+}

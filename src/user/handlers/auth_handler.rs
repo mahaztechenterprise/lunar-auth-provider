@@ -1,11 +1,12 @@
 use std::sync::Arc;
+use axum::http::HeaderMap;
 use axum::{
     extract::State,
     http::StatusCode,
     response::IntoResponse,
     Json,
 };
-use jsonwebtoken::{encode, EncodingKey, Header};
+use jsonwebtoken::{encode, DecodingKey, EncodingKey, Header, TokenData, Validation};
 use serde::{ Serialize, Deserialize };
 use super::super::super::database::configuration::mysql_db_config::PoolConnection;
 use super::user_service::GetUserWithPassword;
@@ -67,11 +68,8 @@ pub async fn login_user(
 {
     let username = body.username;
 
-    let result = sqlx::query_as!(GetUserWithPassword,
-        "SELECT id, username, password, is_active FROM app_user WHERE username = ?",
-        username)
-        .fetch_optional(&data.db)
-        .await;
+    let result = 
+        GetUserWithPassword::get_user_with_password(username, data).await;
 
     if result.is_err() {
         return Err((StatusCode::CONFLICT, 
@@ -122,7 +120,41 @@ pub fn refresh_the_token() {
     todo!("implement handler for refreshing token")
 }
 
-pub fn validate_token() {
-    todo!("validate the access token")
-}
+pub async fn validate_token(headers: HeaderMap) -> Result<impl IntoResponse, (StatusCode, Json<serde_json::Value>)> {
+    let bearer = String::from("Bearer ");
+    let authorize = headers.get("Authorization");
+    
+    let get_token = authorize.ok_or(
+        Err::<(), (StatusCode, Json<serde_json::Value>)>(
+            (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"status": "failed"})))
+        )
+    )
+    .unwrap()
+    .to_str()
+    .map(|op| op.get(bearer.len()..))  // Note the fixed slice: starts from bearer length
+    .map_err(|_err| Err::<(), (StatusCode, Json<serde_json::Value>)>(
+        (StatusCode::UNAUTHORIZED, Json(serde_json::json!({"status": "failed"})))
+    ));
+    
+    if get_token.as_ref().is_err() || get_token.as_ref().unwrap().is_none() {
+        return Err(
+            (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "status": "failed" })))
+        );
+    }
 
+    let token = get_token.unwrap().unwrap();
+
+    let jwt_secret = std::env::var("JWT_SECRET").unwrap();
+    let token = 
+        jsonwebtoken::decode::<TokenClaim>(token, 
+                &DecodingKey::from_secret(jwt_secret.as_ref()), &Validation::default());
+    
+    match token {
+        Ok(TokenData { header: _, claims } ) => 
+            Ok(Json(serde_json::json!(claims))),
+        Err(_) => 
+            Err(
+                (StatusCode::UNAUTHORIZED, Json(serde_json::json!({ "status": "failed" })))
+            ),
+    }
+}
